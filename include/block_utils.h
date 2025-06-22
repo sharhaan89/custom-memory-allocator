@@ -8,6 +8,7 @@ using word_t = intptr_t;
 struct Block {
     size_t size;
     bool used;
+    Block *prev;
     Block *next;
     word_t data[1];
 };
