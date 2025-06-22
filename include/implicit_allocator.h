@@ -15,13 +15,17 @@ namespace implicit_allocator {
         WorstFit
     };
 
-    word_t* alloc(size_t size);
-    void free(word_t* data);
-
+    Block* findBlock(size_t size, FitFunction strategy);
     Block* firstFit(size_t size);
     Block* nextFit(size_t size);
     Block* bestFit(size_t size);
     Block* worstFit(size_t size);
 
-    Block* findBlock(size_t size, FitFunction strategy);
+    bool canSplit(Block* block);
+    bool canCoalesce(Block* block);
+    bool split(Block* block);
+    bool coalesce(Block* block);
+
+    word_t* alloc(size_t size);
+    void free(word_t* data);
 }
