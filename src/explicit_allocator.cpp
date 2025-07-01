@@ -1,19 +1,11 @@
 #include "block_utils.h"
 #include "explicit_allocator.h"
+#include <iostream>
 
-using FitFunction = Block* (*)(size_t); 
+namespace explicit_allocator {
 
-static Block* heapStart = nullptr;
-static Block* top = nullptr; 
-static Block* freeListHead = nullptr;
-static Block* lastAllocated = nullptr;
-
-enum class SearchMode {
-    FirstFit,
-    NextFit,
-    BestFit,
-    WorstFit
-};
+Block* freeListHead = nullptr;
+Block* lastAllocated = nullptr;
 
 Block* findBlock(size_t size, FitFunction strategy) {
     return strategy(size);
@@ -38,16 +30,15 @@ Block* nextFit(size_t size) {
         return firstFit(size);
     }
 
-    Block* block = lastAllocated->next ? lastAllocated->next : freeListHead;
-    Block* start = block;
+    Block* block = lastAllocated;
 
     do {
         if(!block->used && block->size >= size) {
+            lastAllocated = block;
             return block;
         }
-
         block = block->next ? block->next : freeListHead;
-    } while(block != start);
+    } while(block != lastAllocated);
 
     return nullptr;
 }
@@ -119,7 +110,6 @@ Block* split(Block* block, size_t size) {
     
     newBlock->used = false;
     newBlock->size = sizeof(word_t) + originalBlockSize - size - sizeof(Block);
-    addToFreeList(newBlock);
 
     if(block == top) top = newBlock;
 
@@ -128,23 +118,41 @@ Block* split(Block* block, size_t size) {
     return block;
 }
 
+/*
+bool canCoalesce(Block *block) {    
+    std::cout << "Checking coalesce for block " << block << ", used=" << block->used << std::endl;
+    if(block->used) return false;
+    if(block == top) {
+        std::cout << "Block is top, cannot coalesce" << std::endl;
+        return false;
+    }
+    Block* nextBlock = getPhysicalNextBlock(block);
+    std::cout << "Next block: " << nextBlock << ", used=" << (nextBlock ? nextBlock->used : -1) << std::endl;
+    
+    return nextBlock != nullptr && !nextBlock->used;
+}
+*/
+
 bool canCoalesce(Block *block) {    
     if(block->used) return false;
     if(block == top) return false;
 
     Block* nextBlock = getPhysicalNextBlock(block);
 
-    return !nextBlock->used;
+    return nextBlock != nullptr && !nextBlock->used;
 }
 
+//TODO: COALESCE WITH PREVIOUS BLOCKS AS WELL
+//ACTUALLY JUST COALESCE BY SCANNING THE WHOLE FREE LIST
+//WILL DO THIS LATER
 Block* coalesce(Block* block) {
     if(!canCoalesce(block)) return block;
 
     Block* nextBlock = getPhysicalNextBlock(block);
+    removeFromFreeList(nextBlock);
 
     size_t HEADER_SIZE = sizeof(Block) - sizeof(word_t);
     block->size += nextBlock->size + HEADER_SIZE;
-    block->next = nextBlock->next;
 
     if(nextBlock == top) top = block;
 
@@ -180,9 +188,9 @@ word_t *alloc(size_t size) {
 
     if(auto block = findBlock(size, firstFit)) {
         if(canSplit(block, size)) {
+            removeFromFreeList(block);
             block = split(block, size);
             Block* newBlock = getPhysicalNextBlock(block);
-            removeFromFreeList(block);
             addToFreeList(newBlock);
         }
 
@@ -198,6 +206,7 @@ word_t *alloc(size_t size) {
     block->size = size;
     block->used = true;
     block->next = nullptr;
+    block->prev = top;
 
     if(heapStart == nullptr) {
         heapStart = block;
@@ -223,4 +232,6 @@ void free(word_t* data) {
     } 
 
     addToFreeList(block);
+}
+
 }

@@ -1,19 +1,11 @@
 #include "block_utils.h"
 #include "implicit_allocator.h"
 
-using FitFunction = Block* (*)(size_t); 
-//for passing the strategy functions during the findBlock function call
+namespace implicit_allocator {
 
-static Block* heapStart = nullptr;
-static Block* top = nullptr; 
-static Block* lastAllocated = nullptr;
-
-enum class SearchMode {
-    FirstFit,
-    NextFit,
-    BestFit,
-    WorstFit
-};
+Block* heapStart = nullptr;
+Block* top = nullptr; 
+Block* lastAllocated = nullptr;
 
 //uses the strategy function as passed
 Block* findBlock(size_t size, FitFunction strategy) {
@@ -172,7 +164,7 @@ word_t *alloc(size_t size) {
     return block->data;
 }
 
-inline bool canCoalesce(Block *block) {
+bool canCoalesce(Block *block) {
     if(block->next == nullptr) return false;
     if(block->used || block->next->used) return false; 
     
@@ -208,4 +200,6 @@ void free(word_t* data) {
     if(canCoalesce(block)) {
         coalesce(block);
     }
+}
+
 }

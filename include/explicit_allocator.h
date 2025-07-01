@@ -25,10 +25,10 @@ namespace explicit_allocator {
     Block* getPhysicalPreviousBlock(Block* block);
     Block* getPhysicalNextBlock(Block* block);
 
-    bool canSplit(Block* block);
+    bool canSplit(Block* block, size_t size);
     bool canCoalesce(Block* block);
-    bool split(Block* block);
-    bool coalesce(Block* block);
+    Block* split(Block* block, size_t size);
+    Block* coalesce(Block* block);
 
     void removeFromFreeList(Block* block);
     void addToFreeList(Block* block);

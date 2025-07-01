@@ -21,10 +21,10 @@ namespace implicit_allocator {
     Block* bestFit(size_t size);
     Block* worstFit(size_t size);
 
-    bool canSplit(Block* block);
-    bool canCoalesce(Block* block);
-    bool split(Block* block);
-    bool coalesce(Block* block);
+    bool canSplit(Block* block, size_t size);
+    bool canCoalesce(Block* block, size_t size);
+    Block* split(Block* block);
+    Block* coalesce(Block* block);
 
     word_t* alloc(size_t size);
     void free(word_t* data);
