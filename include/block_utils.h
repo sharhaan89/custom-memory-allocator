@@ -13,8 +13,8 @@ struct Block {
     word_t data[1];
 };
 
-extern Block* heapStart; //remove extern later after testing
-extern Block* top; //remove extern later after testing
+//extern Block* heapStart;
+//extern Block* top;
 
 size_t align(size_t n);
 size_t allocSize(size_t size);

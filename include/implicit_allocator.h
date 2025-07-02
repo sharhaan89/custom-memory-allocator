@@ -3,10 +3,13 @@
 #include <cstddef>
 #include "block_utils.h"
 
-namespace implicit_allocator {
-    using FitFunction = Block* (*)(size_t);
+class ImplicitAllocator {
+public:
+    using FitFunction = Block* (ImplicitAllocator::*)(size_t);
 
-    extern Block* lastAllocated;
+    Block* top = nullptr;
+    Block* heapStart = nullptr;
+    Block* lastAllocated = nullptr;
 
     enum class SearchMode {
         FirstFit,
@@ -22,10 +25,10 @@ namespace implicit_allocator {
     Block* worstFit(size_t size);
 
     bool canSplit(Block* block, size_t size);
-    bool canCoalesce(Block* block, size_t size);
-    Block* split(Block* block);
+    bool canCoalesce(Block* block);
+    Block* split(Block* block, size_t size);
     Block* coalesce(Block* block);
 
     word_t* alloc(size_t size);
     void free(word_t* data);
-}
+};

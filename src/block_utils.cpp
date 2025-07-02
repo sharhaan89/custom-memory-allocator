@@ -2,9 +2,6 @@
 #include <unistd.h> 
 #include <cstddef>
 
-Block* heapStart = nullptr;
-Block* top = nullptr;
-
 size_t align(size_t n) {
     return (n + sizeof(word_t) - 1) & ~(sizeof(word_t) - 1);
 }

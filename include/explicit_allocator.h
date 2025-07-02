@@ -3,11 +3,15 @@
 #include <cstddef>
 #include "block_utils.h"
 
-namespace explicit_allocator {
-    using FitFunction = Block* (*)(size_t);
+class ExplicitAllocator {
+public:
+    using FitFunction = Block* (ExplicitAllocator::*)(size_t);
 
-    extern Block* freeListHead;
-    extern Block* lastAllocated;
+    Block* top = nullptr;
+    Block* heapStart = nullptr;
+    Block* freeListHead = nullptr;
+    Block* lastAllocated = nullptr;
+    Block* searchStart = nullptr;
 
     enum class SearchMode {
         FirstFit,
@@ -35,4 +39,4 @@ namespace explicit_allocator {
     
     word_t* alloc(size_t size);
     void free(word_t* data);
-}
+};

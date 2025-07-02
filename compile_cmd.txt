@@ -1,0 +1,1 @@
+g++ -I include -Wall -Wextra -g -o test_allocator main_explicit_allocator.cpp src/explicit_allocator.cpp src/block_utils.cpp

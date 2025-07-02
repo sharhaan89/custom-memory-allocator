@@ -5,13 +5,14 @@
 #include "explicit_allocator.h"
 #include "block_utils.h"
 
-using namespace explicit_allocator;
+// Global allocator instance
+ExplicitAllocator allocator;
 
 // Test helper functions
 void printHeapState() {
     std::cout << "\n--- Heap State ---\n";
     std::cout << "Free List: ";
-    Block* current = freeListHead;
+    Block* current = allocator.freeListHead;
     int count = 0;
     while(current && count < 20) {  // Limit iterations!
         std::cout << "[" << current << ": size=" << current->size << "] -> ";
@@ -24,10 +25,10 @@ void printHeapState() {
 
 void resetHeap() {
     // Simple reset - in practice you'd need proper cleanup
-    freeListHead = nullptr;
-    lastAllocated = nullptr;
-    heapStart = nullptr;
-    top = nullptr;
+    allocator.freeListHead = nullptr;
+    allocator.lastAllocated = nullptr;
+    allocator.heapStart = nullptr;
+    allocator.top = nullptr;
 }
 
 // Test basic allocation and deallocation
@@ -36,7 +37,7 @@ void testBasicAllocation() {
     resetHeap();
     
     // Test simple allocation
-    word_t* ptr1 = alloc(64);
+    word_t* ptr1 = allocator.alloc(64);
     assert(ptr1 != nullptr);
     std::cout << "✓ Basic allocation successful\n";
     
@@ -46,8 +47,8 @@ void testBasicAllocation() {
     std::cout << "✓ Memory write/read successful\n";
     
     // Test multiple allocations
-    word_t* ptr2 = alloc(128);
-    word_t* ptr3 = alloc(256);
+    word_t* ptr2 = allocator.alloc(128);
+    word_t* ptr3 = allocator.alloc(256);
     assert(ptr2 != nullptr && ptr3 != nullptr);
     assert(ptr1 != ptr2 && ptr2 != ptr3 && ptr1 != ptr3);
     std::cout << "✓ Multiple allocations successful\n";
@@ -55,7 +56,7 @@ void testBasicAllocation() {
     printHeapState();
     
     // Test deallocation
-    free(ptr2);
+    allocator.free(ptr2);
     std::cout << "✓ Deallocation successful\n";
     printHeapState();
 }
@@ -66,27 +67,27 @@ void testCoalescing() {
     resetHeap();
     
     // Allocate several blocks
-    word_t* ptr1 = alloc(100);
-    word_t* ptr2 = alloc(100);
-    word_t* ptr3 = alloc(100);
-    word_t* ptr4 = alloc(100);
+    word_t* ptr1 = allocator.alloc(100);
+    word_t* ptr2 = allocator.alloc(100);
+    word_t* ptr3 = allocator.alloc(100);
+    word_t* ptr4 = allocator.alloc(100);
     
     std::cout << "Allocated 4 blocks of 100 bytes each\n";
     printHeapState();
     
     // Free middle blocks to create fragmentation
-    free(ptr2);
-    free(ptr3);
+    allocator.free(ptr2);
+    allocator.free(ptr3);
     std::cout << "Freed middle two blocks\n";
     printHeapState();
     
     // Free adjacent block to test coalescing
-    free(ptr4);
+    allocator.free(ptr4);
     std::cout << "Freed last block - should coalesce with previous free blocks\n";
     printHeapState();
     
     // Try to allocate a large block that should fit in coalesced space
-    word_t* large_ptr = alloc(250);
+    word_t* large_ptr = allocator.alloc(250);
     if(large_ptr) {
         std::cout << "✓ Successfully allocated large block after coalescing\n";
     } else {
@@ -103,27 +104,27 @@ void testFitStrategies() {
     // Create some fragmented free blocks
     word_t* ptrs[6];
     for(int i = 0; i < 6; i++) {
-        ptrs[i] = alloc(50 + i * 20); // Different sizes: 50, 70, 90, 110, 130, 150
+        ptrs[i] = allocator.alloc(50 + i * 20); // Different sizes: 50, 70, 90, 110, 130, 150
     }
     
     // Free every other block to create fragmentation
-    free(ptrs[1]); // 70 bytes
-    free(ptrs[3]); // 110 bytes
-    free(ptrs[5]); // 150 bytes
+    allocator.free(ptrs[1]); // 70 bytes
+    allocator.free(ptrs[3]); // 110 bytes
+    allocator.free(ptrs[5]); // 150 bytes
     
     std::cout << "Created fragmented heap with free blocks of sizes 70, 110, 150\n";
     printHeapState();
     
     // Test first fit
-    Block* block = firstFit(80);
+    Block* block = allocator.firstFit(80);
     std::cout << "First fit for 80 bytes: " << (block ? "found block of size " + std::to_string(block->size) : "not found") << "\n";
     
     // Test best fit
-    block = bestFit(80);
+    block = allocator.bestFit(80);
     std::cout << "Best fit for 80 bytes: " << (block ? "found block of size " + std::to_string(block->size) : "not found") << "\n";
     
     // Test worst fit
-    block = worstFit(80);
+    block = allocator.worstFit(80);
     std::cout << "Worst fit for 80 bytes: " << (block ? "found block of size " + std::to_string(block->size) : "not found") << "\n";
 }
 
@@ -133,21 +134,21 @@ void testSplitting() {
     resetHeap();
     
     // Allocate and free a large block
-    word_t* large_ptr = alloc(1000);
-    free(large_ptr);
+    word_t* large_ptr = allocator.alloc(1000);
+    allocator.free(large_ptr);
     
     std::cout << "Created large free block of 1000 bytes\n";
     printHeapState();
     
     // Allocate a smaller block - should split the large one
-    word_t* small_ptr = alloc(200);
+    word_t* small_ptr = allocator.alloc(200);
     assert(small_ptr != nullptr);
     
     std::cout << "Allocated 200 bytes - should split the large block\n";
     printHeapState();
     
     // Check if we can still allocate more from the remaining space
-    word_t* another_ptr = alloc(300);
+    word_t* another_ptr = allocator.alloc(300);
     if(another_ptr) {
         std::cout << "✓ Successfully allocated from remaining split block\n";
     } else {
@@ -162,22 +163,22 @@ void testEdgeCases() {
     resetHeap();
     
     // Test zero allocation
-    word_t* zero_ptr = alloc(0);
+    word_t* zero_ptr = allocator.alloc(0);
     std::cout << "Zero allocation: " << (zero_ptr ? "succeeded" : "failed") << "\n";
     
     // Test very small allocation
-    word_t* tiny_ptr = alloc(1);
+    word_t* tiny_ptr = allocator.alloc(1);
     assert(tiny_ptr != nullptr);
     std::cout << "✓ Tiny allocation (1 byte) successful\n";
     
     // Test large allocation
-    word_t* huge_ptr = alloc(10000);
+    word_t* huge_ptr = allocator.alloc(10000);
     assert(huge_ptr != nullptr);
     std::cout << "✓ Large allocation (10KB) successful\n";
     
     // Test alignment
     for(int i = 1; i <= 20; i++) {
-        word_t* ptr = alloc(i);
+        word_t* ptr = allocator.alloc(i);
         assert(ptr != nullptr);
         assert(((uintptr_t)ptr) % sizeof(word_t) == 0);
     }
@@ -194,21 +195,21 @@ void testNextFit() {
     // Create fragmented memory
     word_t* ptrs[8];
     for(int i = 0; i < 8; i++) {
-        ptrs[i] = alloc(64);
+        ptrs[i] = allocator.alloc(64);
     }
     
     // Free every other block
     for(int i = 1; i < 8; i += 2) {
-        free(ptrs[i]);
+        allocator.free(ptrs[i]);
     }
     
     std::cout << "Created fragmented memory with alternating free blocks\n";
     printHeapState();
     
     // Test next fit behavior
-    word_t* next1 = alloc(32);
-    word_t* next2 = alloc(32);
-    word_t* next3 = alloc(32);
+    word_t* next1 = allocator.alloc(32);
+    word_t* next2 = allocator.alloc(32);
+    word_t* next3 = allocator.alloc(32);
     
     std::cout << "Allocated 3 blocks using next fit\n";
     std::cout << "Pointers: " << next1 << ", " << next2 << ", " << next3 << "\n";
@@ -225,7 +226,7 @@ void testPerformance() {
     
     // Allocate many blocks
     for(int i = 0; i < NUM_ALLOCS; i++) {
-        word_t* ptr = alloc(64 + (i % 100));
+        word_t* ptr = allocator.alloc(64 + (i % 100));
         if(ptr) {
             ptrs.push_back(ptr);
             // Write some data to ensure the memory is valid
@@ -237,7 +238,7 @@ void testPerformance() {
     
     // Free half of them randomly
     for(size_t i = 0; i < ptrs.size(); i += 2) {
-        free(ptrs[i]);
+        allocator.free(ptrs[i]);
     }
     
     std::cout << "Freed half the blocks\n";
@@ -245,7 +246,7 @@ void testPerformance() {
     // Try to allocate more
     int successful_allocs = 0;
     for(int i = 0; i < 100; i++) {
-        word_t* ptr = alloc(128);
+        word_t* ptr = allocator.alloc(128);
         if(ptr) {
             successful_allocs++;
             *ptr = i + 10000;

@@ -1,20 +1,14 @@
 #include "block_utils.h"
 #include "implicit_allocator.h"
 
-namespace implicit_allocator {
-
-Block* heapStart = nullptr;
-Block* top = nullptr; 
-Block* lastAllocated = nullptr;
-
 //uses the strategy function as passed
-Block* findBlock(size_t size, FitFunction strategy) {
-    return strategy(size);
+Block* ImplicitAllocator::findBlock(size_t size, FitFunction strategy) {
+    return (this->*strategy)(size);
 }
 
 //return the first empty block that can fit the requirement
-Block* firstFit(size_t size) {
-    Block* block = heapStart;
+Block* ImplicitAllocator::firstFit(size_t size) {
+    Block* block = this->heapStart;
     
     while(block != nullptr) {
         if(!block->used && block->size >= size) {
@@ -28,10 +22,10 @@ Block* firstFit(size_t size) {
 }
 
 //returns the first empty block starting from the last allocated block that can fit the requirement
-Block* nextFit(size_t size) {
-    if(!lastAllocated) return nullptr; // no blocks yet
+Block* ImplicitAllocator::nextFit(size_t size) {
+    if(!this->lastAllocated) return nullptr; // no blocks yet
 
-    Block* block = lastAllocated->next ? lastAllocated->next : heapStart;
+    Block* block = this->lastAllocated->next ? this->lastAllocated->next : this->heapStart;
     Block* start = block;
 
     do {
@@ -39,15 +33,15 @@ Block* nextFit(size_t size) {
             return block;
         }
 
-        block = block->next ? block->next : heapStart;
+        block = block->next ? block->next : this->heapStart;
     } while(block != start);
 
     return nullptr;
 }
 
 //returns the block that can fit the requirement and of the smallest possible size
-Block *bestFit(size_t size) {
-    Block* block = heapStart;
+Block* ImplicitAllocator::bestFit(size_t size) {
+    Block* block = this->heapStart;
     Block* resBlock = nullptr;
 
     while(block != nullptr) {
@@ -63,8 +57,8 @@ Block *bestFit(size_t size) {
     return resBlock;
 }
 
-Block *worstFit(size_t size) {
-    Block* block = heapStart;
+Block* ImplicitAllocator::worstFit(size_t size) {
+    Block* block = this->heapStart;
     Block* resBlock = nullptr;
 
     while(block != nullptr) {
@@ -93,7 +87,7 @@ extra data >= header + data + size - data
 
 block->size >= sizeof(Block) + size 
 Block->size = data + extra data */
-inline bool canSplit(Block* block, size_t size) {
+bool ImplicitAllocator::canSplit(Block* block, size_t size) {
     return (block->size >= sizeof(Block) + size);
 } 
 
@@ -112,7 +106,7 @@ sizeof(Block) + originalBlockSize - sizeof(word_t) =
 2sizeof(Block) + size + x - 2sizeof(word_t)
 
 x = sizeof(word_t) + block->size - size - sizeof(Block) */
-Block* split(Block* block, size_t size) {
+Block* ImplicitAllocator::split(Block* block, size_t size) {
     Block* originalNextBlock = nullptr;
     size_t originalBlockSize = block->size;
 
@@ -133,12 +127,12 @@ Block* split(Block* block, size_t size) {
     return block;
 }
 
-word_t *alloc(size_t size) {
+word_t* ImplicitAllocator::alloc(size_t size) {
     size = align(size);
 
-    if(auto block = findBlock(size, firstFit)) {
-        if(canSplit(block, size)) block = split(block, size);
-        lastAllocated = block;
+    if(auto block = this->findBlock(size, &ImplicitAllocator::firstFit)) {
+        if(this->canSplit(block, size)) block = this->split(block, size);
+        this->lastAllocated = block;
         block->used = true;
         return block->data;
     }   
@@ -150,21 +144,21 @@ word_t *alloc(size_t size) {
     block->used = true;
     block->next = nullptr;
 
-    if(heapStart == nullptr) {
-        heapStart = block;
+    if(this->heapStart == nullptr) {
+        this->heapStart = block;
     }
 
-    if(top != nullptr) {
-        top->next = block;
+    if(this->top != nullptr) {
+        this->top->next = block;
     }
 
-    lastAllocated = block;
-    top = block;
+    this->lastAllocated = block;
+    this->top = block;
 
     return block->data;
 }
 
-bool canCoalesce(Block *block) {
+bool ImplicitAllocator::canCoalesce(Block *block) {
     if(block->next == nullptr) return false;
     if(block->used || block->next->used) return false; 
     
@@ -183,7 +177,7 @@ payload = payload1 + header2 + payload2
 
 we don't need the header of the second block
 so we can utilise it for the user payload memory*/
-Block* coalesce(Block* block) {
+Block* ImplicitAllocator::coalesce(Block* block) {
     Block* nextBlock = block->next;
 
     size_t HEADER_SIZE = sizeof(Block) - sizeof(word_t);
@@ -193,13 +187,11 @@ Block* coalesce(Block* block) {
     return block;
 }
 
-void free(word_t* data) {
+void ImplicitAllocator::free(word_t* data) {
     Block* block = getHeader(data); //points to the starting of the block now
     block->used = false;
 
-    if(canCoalesce(block)) {
-        coalesce(block);
+    if(this->canCoalesce(block)) {
+        this->coalesce(block);
     }
-}
-
 }
