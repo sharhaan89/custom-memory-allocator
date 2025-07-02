@@ -2,17 +2,12 @@
 #include "explicit_allocator.h"
 #include <iostream>
 
-namespace explicit_allocator {
-
-Block* freeListHead = nullptr;
-Block* lastAllocated = nullptr;
-
-Block* findBlock(size_t size, FitFunction strategy) {
-    return strategy(size);
+Block* ExplicitAllocator::findBlock(size_t size, FitFunction strategy) {
+    return (this->*strategy)(size);
 }
 
-Block* firstFit(size_t size) {
-    Block* block = freeListHead;
+Block* ExplicitAllocator::firstFit(size_t size) {
+    Block* block = this->freeListHead;
     
     while(block != nullptr) {
         if(!block->used && block->size >= size) {
@@ -25,26 +20,25 @@ Block* firstFit(size_t size) {
     return nullptr;
 }
 
-Block* nextFit(size_t size) {
-    if(!lastAllocated) {
-        return firstFit(size);
+Block* ExplicitAllocator::nextFit(size_t size) {
+    if(!this->searchStart) {
+        return this->firstFit(size);
     }
 
-    Block* block = lastAllocated;
+    Block* block = this->searchStart;
 
     do {
         if(!block->used && block->size >= size) {
-            lastAllocated = block;
             return block;
         }
-        block = block->next ? block->next : freeListHead;
-    } while(block != lastAllocated);
+        block = block->next ? block->next : this->freeListHead;
+    } while(block != this->searchStart);
 
     return nullptr;
 }
 
-Block *bestFit(size_t size) {
-    Block* block = freeListHead;
+Block* ExplicitAllocator::bestFit(size_t size) {
+    Block* block = this->freeListHead;
     Block* resBlock = nullptr;
 
     while(block != nullptr) {
@@ -60,8 +54,8 @@ Block *bestFit(size_t size) {
     return resBlock;
 }
 
-Block *worstFit(size_t size) {
-    Block* block = freeListHead;
+Block* ExplicitAllocator::worstFit(size_t size) {
+    Block* block = this->freeListHead;
     Block* resBlock = nullptr;
 
     while(block != nullptr) {
@@ -78,13 +72,13 @@ Block *worstFit(size_t size) {
 }
 
 //TODO: need to figure out a way to get this later
-Block* getPhysicalPreviousBlock(Block *block) {
+Block* ExplicitAllocator::getPhysicalPreviousBlock(Block *block) {
     Block* prevBlock = nullptr;
     return nullptr;
 }
 
-Block* getPhysicalNextBlock(Block *block) {
-    if(block == top) {
+Block* ExplicitAllocator::getPhysicalNextBlock(Block *block) {
+    if(block == this->top) {
         return nullptr;
     }
 
@@ -95,13 +89,13 @@ Block* getPhysicalNextBlock(Block *block) {
     return nextBlock;
 }
 
-bool canSplit(Block* block, size_t size) {
+bool ExplicitAllocator::canSplit(Block* block, size_t size) {
     if(block->used) return false;
     return (block->size >= sizeof(Block) + size);
 } 
 
-Block* split(Block* block, size_t size) {
-    removeFromFreeList(block);
+Block* ExplicitAllocator::split(Block* block, size_t size) {
+    //this->removeFromFreeList(block);
 
     size_t originalBlockSize = block->size;
 
@@ -111,7 +105,7 @@ Block* split(Block* block, size_t size) {
     newBlock->used = false;
     newBlock->size = sizeof(word_t) + originalBlockSize - size - sizeof(Block);
 
-    if(block == top) top = newBlock;
+    if(block == this->top) this->top = newBlock;
 
     block->size = size;
 
@@ -133,11 +127,11 @@ bool canCoalesce(Block *block) {
 }
 */
 
-bool canCoalesce(Block *block) {    
+bool ExplicitAllocator::canCoalesce(Block *block) {    
     if(block->used) return false;
-    if(block == top) return false;
+    if(block == this->top) return false;
 
-    Block* nextBlock = getPhysicalNextBlock(block);
+    Block* nextBlock = this->getPhysicalNextBlock(block);
 
     return nextBlock != nullptr && !nextBlock->used;
 }
@@ -145,56 +139,58 @@ bool canCoalesce(Block *block) {
 //TODO: COALESCE WITH PREVIOUS BLOCKS AS WELL
 //ACTUALLY JUST COALESCE BY SCANNING THE WHOLE FREE LIST
 //WILL DO THIS LATER
-Block* coalesce(Block* block) {
-    if(!canCoalesce(block)) return block;
+Block* ExplicitAllocator::coalesce(Block* block) {
+    if(!this->canCoalesce(block)) return block;
 
-    Block* nextBlock = getPhysicalNextBlock(block);
-    removeFromFreeList(nextBlock);
+    Block* nextBlock = this->getPhysicalNextBlock(block);
+    this->removeFromFreeList(nextBlock);
 
     size_t HEADER_SIZE = sizeof(Block) - sizeof(word_t);
     block->size += nextBlock->size + HEADER_SIZE;
 
-    if(nextBlock == top) top = block;
+    if(nextBlock == this->top) this->top = block;
 
     return block;
 }
 
-void removeFromFreeList(Block* block) {
+void ExplicitAllocator::removeFromFreeList(Block* block) {
     Block* prevBlock = block->prev;
     Block* nextBlock = block->next;
 
     if(prevBlock) {
         prevBlock->next = nextBlock;
     } else {
-        freeListHead = nextBlock;
+        this->freeListHead = nextBlock;
     }
 
     if(nextBlock) nextBlock->prev = prevBlock;
 }
 
-void addToFreeList(Block* block) {
-    block->next = freeListHead;
+void ExplicitAllocator::addToFreeList(Block* block) {
+    block->next = this->freeListHead;
     block->prev = nullptr;
     
-    if(freeListHead) {
-        freeListHead->prev = block;
+    if(this->freeListHead) {
+        this->freeListHead->prev = block;
     }
 
-    freeListHead = block;
+    this->freeListHead = block;
 }
 
-word_t *alloc(size_t size) {
+word_t* ExplicitAllocator::alloc(size_t size) {
     size = align(size);
 
-    if(auto block = findBlock(size, firstFit)) {
-        if(canSplit(block, size)) {
-            removeFromFreeList(block);
-            block = split(block, size);
-            Block* newBlock = getPhysicalNextBlock(block);
-            addToFreeList(newBlock);
-        }
-
-        lastAllocated = block;
+    if(auto block = this->findBlock(size, &ExplicitAllocator::firstFit)) {
+        if(this->canSplit(block, size)) {
+            block = this->split(block, size);
+            Block* newBlock = this->getPhysicalNextBlock(block);
+            this->addToFreeList(newBlock);
+        }   
+        
+        if(block->next) searchStart = block->next;
+        else searchStart = freeListHead;
+        this->removeFromFreeList(block);
+        this->lastAllocated = block;
         block->used = true;
 
         return block->data;
@@ -206,32 +202,30 @@ word_t *alloc(size_t size) {
     block->size = size;
     block->used = true;
     block->next = nullptr;
-    block->prev = top;
+    block->prev = this->top;
 
-    if(heapStart == nullptr) {
-        heapStart = block;
+    if(this->heapStart == nullptr) {
+        this->heapStart = block;
     }
 
-    if(top != nullptr) {
-        top->next = block;
+    if(this->top != nullptr) {
+        this->top->next = block;
     }
 
-    lastAllocated = block;
-    top = block;
+    this->lastAllocated = block;
+    this->top = block;
 
     return block->data;
 }
 
-void free(word_t* data) {
+void ExplicitAllocator::free(word_t* data) {
     Block* block = getHeader(data);
     block->used = false;
 
-    if(canCoalesce(block)) {
-        coalesce(block);
+    if(this->canCoalesce(block)) {
+        this->coalesce(block);
         return;
     } 
 
-    addToFreeList(block);
-}
-
+    this->addToFreeList(block);
 }
