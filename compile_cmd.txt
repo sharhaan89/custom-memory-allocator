@@ -1,1 +1,8 @@
-g++ -I include -Wall -Wextra -g -o test_allocator main_explicit_allocator.cpp src/explicit_allocator.cpp src/block_utils.cpp
+explicit_allocator: 
+g++ -I include -Wall -Wextra -g -o test_implicit main_implicit_allocator.cpp src/implicit_allocator.cpp src/block_utils.cpp
+
+explicit_allocator: 
+g++ -I include -Wall -Wextra -g -o test_explicit main_explicit_allocator.cpp src/explicit_allocator.cpp src/block_utils.cpp
+
+segregated_allocator:
+g++ -I include -Wall -Wextra -g -o test_seg main_segregated_allocator.cpp src/segregated_allocator.cpp src/block_utils.cpp src/explicit_allocator.cpp
